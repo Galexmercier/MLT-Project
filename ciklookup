@@ -1,0 +1,31 @@
+import requests
+
+class SecEdgar:
+    def __init__(self, fileurl) -> None:
+        self.fileurl = fileurl
+        self.namedict = {}
+        self.tickerdict = {}
+
+        headers = {'user-agent': 'MLT galexmercier@gmail.com'}
+        r = requests.get(self.fileurl, headers=headers)
+        self.filejson = r.json()
+        self.cik_json_to_dict()
+
+    def cik_json_to_dict(self):
+        for entry in self.filejson.values():
+            self.namedict[entry["title"]] = entry
+            self.tickerdict[entry["ticker"]] = entry
+
+    def name_to_cik(self, name):
+        if name not in self.namedict:
+            print("Error: name not found")
+        else: return self.namedict[name]
+    
+    def ticker_to_cik(self, ticker):
+        if ticker not in self.tickerdict:
+            print("Error: ticker not found")
+        else: return self.tickerdict[ticker]
+
+se = SecEdgar("https://www.sec.gov/files/company_tickers.json")
+print(se.name_to_cik("Apple Inc."))
+print(se.ticker_to_cik("AAPL"))
