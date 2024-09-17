@@ -2,30 +2,82 @@ import requests
 
 class SecEdgar:
     def __init__(self, fileurl) -> None:
-        self.fileurl = fileurl
-        self.namedict = {}
-        self.tickerdict = {}
+        self.file_url = fileurl
+        self.name_dict = {}
+        self.ticker_dict = {}
 
-        headers = {'user-agent': 'MLT galexmercier@gmail.com'}
-        r = requests.get(self.fileurl, headers=headers)
-        self.filejson = r.json()
+        self.headers = {'user-agent': 'MLT galexmercier@gmail.com'}
+        r = requests.get(self.file_url, headers=self.headers)
+        self.file_json = r.json()
         self.cik_json_to_dict()
 
     def cik_json_to_dict(self):
-        for entry in self.filejson.values():
-            self.namedict[entry["title"]] = entry
-            self.tickerdict[entry["ticker"]] = entry
+        for entry in self.file_json.values():
+            self.name_dict[entry["title"]] = entry
+            self.ticker_dict[entry["ticker"]] = entry
 
     def name_to_cik(self, name):
-        if name not in self.namedict:
+        if name not in self.name_dict:
             print("Error: name not found")
-        else: return self.namedict[name]
+        else: return self.name_dict[name]
     
     def ticker_to_cik(self, ticker):
-        if ticker not in self.tickerdict:
+        if ticker not in self.ticker_dict:
             print("Error: ticker not found")
-        else: return self.tickerdict[ticker]
+        else: return self.ticker_dict[ticker]
+
+    def get_url(self, cik):
+        url = "https://data.sec.gov/submissions/CIK"
+        digits = len(str(cik))
+        str_cik = str(cik)
+        if digits < 10:
+            new_digits = "" 
+            for i in range(10 - digits):
+                new_digits += "0"
+            new_digits += str_cik
+            str_cik = new_digits
+        url += str_cik
+        url += ".json"
+        return url
+
+    def annual_filing(self, cik, year):
+        url = self.get_url(cik)
+        filings = requests.get(url, headers=self.headers).json()["filings"]["recent"]
+        access_num = filings["accessionNumber"]
+        primary_doc = filings["primaryDocument"]
+        primary_doc_desc = filings["primaryDocDescription"]
+        for i in range(len(access_num)):
+            contents = access_num[i].split('-')
+            if int(contents[1]) == year % 100 and primary_doc_desc[i] == "10-K":
+                correct_access_num = "".join(contents)
+                res = "https://www.sec.gov/Archives/edgar/data/" + str(cik) + "/" + correct_access_num + "/" + str(primary_doc[i])
+                print(res)
+                return requests.get(res, headers=self.headers)
+    
+    def quarterly_filing(self, cik, year, quarter):
+        month_to_quarter = {"01": 1, "02": 1, "03": 1,
+                            "04": 2, "05": 2, "06": 2,
+                            "07": 3, "08": 3, "09": 3,
+                            "10": 4, "11": 4, "12": 4}
+
+        url = self.get_url(cik)
+        filings = requests.get(url, headers=self.headers).json()["filings"]["recent"]
+        access_num = filings["accessionNumber"]
+        primary_doc = filings["primaryDocument"]
+        primary_doc_desc = filings["primaryDocDescription"]
+        filing_date = filings["filingDate"]
+        for i in range(len(access_num)):
+            contents = access_num[i].split('-')
+            date = filing_date[i].split('-')
+            if int(contents[1]) == year % 100 and primary_doc_desc[i] == "10-Q" and month_to_quarter[date[1]] == quarter:
+                correct_access_num = "".join(contents)
+                res = "https://www.sec.gov/Archives/edgar/data/" + str(cik) + "/" + correct_access_num + "/" + str(primary_doc[i])
+                print(res)
+                return requests.get(res, headers=self.headers)
 
 se = SecEdgar("https://www.sec.gov/files/company_tickers.json")
+entry = se.name_to_cik("Apple Inc.")
 print(se.name_to_cik("Apple Inc."))
 print(se.ticker_to_cik("AAPL"))
+
+print(se.quarterly_filing(entry['cik_str'], 2022, 3))
